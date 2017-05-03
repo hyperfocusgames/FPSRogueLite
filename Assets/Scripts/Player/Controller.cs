@@ -11,8 +11,8 @@ public class Controller : MonoBehaviour {
 	protected const float horizontalSpeedPercent = 1f;
 	protected const float maxLateralMagnitude = 50f;
 
-	public float speed = 5f;
-	public float jumpForce = 1f;
+	public float speed = 7f;
+	public float jumpForce = .5f;
 	public float xSens = 1f;
 	public float ySens = 1f;
 	public LayerMask jumpLM;
