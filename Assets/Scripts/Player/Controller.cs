@@ -4,6 +4,8 @@ using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
 public class Controller : MonoBehaviour {
+	public static Controller instance;
+
 	protected const string FORWARD_AXIS = "Vertical";
 	protected const string RIGHT_AXIS = "Horizontal";
 	protected const string JUMP_AXIS = "Jump";
@@ -20,13 +22,22 @@ public class Controller : MonoBehaviour {
 	public LayerMask jumpLM;
 	public LineRenderer velocityLine;
 	public Vector3 velocityLineOffset;
+	public Ability[] abilities;
 
 	protected Rigidbody rb;
 	protected Camera cam;
 	protected Collider ground;
 
-	void Awake ()
+	void Start ()
 	{
+		if(instance != null)
+		{
+			Destroy(gameObject);
+			return;
+		}
+
+		instance = this;
+
 		rb = GetComponent<Rigidbody>();
 		cam = GetComponentInChildren<Camera>();
 
@@ -40,6 +51,11 @@ public class Controller : MonoBehaviour {
 	{
 		rotate();
 		drawNormalizedVelocity();
+
+		if(Input.GetButtonDown("Fire1"))
+		{
+			abilities[0].activate(gameObject);
+		}
 	}
 
 	void FixedUpdate()
@@ -62,12 +78,16 @@ public class Controller : MonoBehaviour {
 	{
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
+
+		Crosshair.instance.generate();
 	}
 
 	public void unlockMouse()
 	{
 		Cursor.lockState = CursorLockMode.None;
 		Cursor.visible = true;
+
+		Crosshair.instance.degenerate();
 	}
 
 	protected void move()
