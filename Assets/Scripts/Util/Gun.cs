@@ -7,6 +7,7 @@ public class Gun : MonoBehaviour
 	public Vector3 tipOffset;
 	public LineRenderer trail;
 	public Light flash;
+	public Vector3 flashOffset;
 	public float volume;
 
 	protected AudioSource source;
@@ -30,9 +31,9 @@ public class Gun : MonoBehaviour
 
 	public void playEffect(Vector3 target, float time)
 	{
-		Destroy(Instantiate(flash, transform.position, transform.rotation), time);
+		Destroy(Instantiate(flash, transform.TransformPoint(flashOffset + tipOffset), transform.rotation).gameObject, time);
 		
-		LineRenderer lr = Instantiate(trail, transform.position, transform.rotation);
+		LineRenderer lr = Instantiate(trail, Tip, transform.rotation);
 		lr.positionCount = 2;
 		lr.SetPosition(0, Tip);
 		lr.SetPosition(1, target);

@@ -10,7 +10,7 @@ public class Shoot : Ability
 	protected LineRenderer lr;
 	public LayerMask lm;
 
-	void setup(GameObject go)
+	protected bool setup(GameObject go)
 	{
 		gun = findGun(go);
 		if(gun != null)
@@ -20,7 +20,14 @@ public class Shoot : Ability
 			{
 				lr.positionCount = 2;
 			}
+
+			if(gun != null)
+			{
+				return true;
+			}
 		}
+
+		return false;
 	}
 
 	protected Gun findGun(GameObject go)
@@ -32,26 +39,27 @@ public class Shoot : Ability
     {
 		if(gun == null)
 		{
-			setup(go);
-		}
-		else
-		{
-			if(base.activate(go))
+			if(!setup(go))
 			{
-				Vector3 tar;
-				RaycastHit hit = new RaycastHit();
-				if(Physics.Raycast(transform.position, transform.forward, out hit, MAX_DISTANCE, lm))
-				{
-					tar = hit.point;
-				}
-				else
-				{
-					tar = transform.position + transform.forward * MAX_DISTANCE;
-				}
-
-				gun.playEffect(tar, effectTime);
-				return true;
+				return false;
 			}
+		}
+
+		if(base.activate(go))
+		{
+			Vector3 tar;
+			RaycastHit hit = new RaycastHit();
+			if(Physics.Raycast(transform.position, transform.forward, out hit, MAX_DISTANCE, lm))
+			{
+				tar = hit.point;
+			}
+			else
+			{
+				tar = transform.position + transform.forward * MAX_DISTANCE;
+			}
+
+			gun.playEffect(tar, effectTime);
+			return true;
 		}
 
 		return false;

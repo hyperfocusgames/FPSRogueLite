@@ -9,6 +9,10 @@ public class Controller : MonoBehaviour {
 	protected const string FORWARD_AXIS = "Vertical";
 	protected const string RIGHT_AXIS = "Horizontal";
 	protected const string JUMP_AXIS = "Jump";
+	protected const string LOOK_X_AXIS = "X";
+	protected const string LOOK_Y_AXIS = "Y";
+	protected const string SHOOT_AXIS = "Fire1";
+
 	protected const float HORIZONTAL_SNAP_PERCENT = .5f;
 	protected const float HORIZONTAL_SPEED_PERCENT = 1f;
 	protected const float MAX_LATERAL_MAGNITUDE = 30f;
@@ -19,14 +23,23 @@ public class Controller : MonoBehaviour {
 	public float jumpForce = .5f;
 	public float xSens = 1f;
 	public float ySens = 1f;
-	public LayerMask jumpLM;
+	public LayerMask groundLM;
 	public LineRenderer velocityLine;
 	public Vector3 velocityLineOffset;
+	public Vector3 groundCheckOffset = new Vector3(0, .1f, 0);
 	public Ability[] abilities;
 
 	protected Rigidbody rb;
 	protected Camera cam;
-	protected Collider ground;
+	protected RaycastHit ground;
+
+	public bool IsGrounded
+	{
+		get
+		{
+			return ground.collider != null;
+		}
+	}
 
 	void Start ()
 	{
@@ -52,7 +65,7 @@ public class Controller : MonoBehaviour {
 		rotate();
 		drawNormalizedVelocity();
 
-		if(Input.GetButtonDown("Fire1"))
+		if(Input.GetButtonDown(SHOOT_AXIS))
 		{
 			abilities[0].activate(gameObject);
 		}
@@ -60,7 +73,7 @@ public class Controller : MonoBehaviour {
 
 	void FixedUpdate()
 	{
-		if(isGrounded())
+		if(checkGrounded())
 		{
 			if(!jump())
 			{
@@ -71,6 +84,8 @@ public class Controller : MonoBehaviour {
 		move();
 		
 		capLateralSpeed();
+
+		applyGravity();
 
 	}
 
@@ -95,18 +110,35 @@ public class Controller : MonoBehaviour {
 		Vector3 localVel = transform.InverseTransformDirection(rb.velocity);
 
 
-		// For Accelerate() and accelerate1()
+		// For quake and first itteration acceleration
 		/*
 		Vector3 input = transform.TransformDirection(new Vector3(Input.GetAxis(RIGHT_AXIS), 0, Input.GetAxis(FORWARD_AXIS)));
 		Vector3 velocity = Accelerate(input, rb.velocity, acceleration, MAX_ACCELERATION);
 		*/
 
-		// For accelerate2
+		// For second itteration acceleration
 		Vector3 input = new Vector3(Input.GetAxis(RIGHT_AXIS), 0, Input.GetAxis(FORWARD_AXIS));
-		Vector3 velocity = accelerate2(input, localVel);
+		Vector3 velocity = accelerate(input, localVel);
+
+		if(IsGrounded)
+		{
+			velocity = orientToGround(velocity);
+		}
 
 		// Set velocity
 		rb.velocity = transform.TransformDirection(velocity);
+	}
+
+	// Oreient velocity relative to the normal the player is standing on.
+	protected Vector3 orientToGround(Vector3 startVel)
+	{
+		// orient norm to normal of ground point
+		Vector3 norm = transform.InverseTransformDirection(ground.normal);
+
+		Vector3 vel = Vector3.ProjectOnPlane(new Vector3(startVel.x, 0, startVel.z), norm);
+		vel.y += startVel.y;
+
+		return vel;
 	}
 
 	// Draw a line renderer according to the current lateral velocity
@@ -124,7 +156,7 @@ public class Controller : MonoBehaviour {
 	}
 
 	// First itteration of custom movement
-	protected Vector3 accelerate1(Vector3 dir, Vector3 vel)
+	/*protected Vector3 accelerate(Vector3 dir, Vector3 vel)
 	{
 		float proj = Vector3.Dot(vel, dir);
 		float accelVel = acceleration * Time.fixedDeltaTime;
@@ -135,17 +167,18 @@ public class Controller : MonoBehaviour {
 		}
 
 		return vel + dir * accelVel;
-	}
+	}*/
 
 	// Second iteration of custom movement
 	// Set velocity to movement vector as long as a forward movement is pressed.
 	// OW, if strafe is pressed
 	//		Set strafe to clamped value if below it.
 	//		OR add strafe value.
-	protected Vector3 accelerate2(Vector3 input, Vector3 startVel)
+	protected Vector3 accelerate(Vector3 input, Vector3 startVel)
 	{
+
 		Vector3 vel;
-		if(input.z != 0 && ground != null)
+		if(input.z != 0 && IsGrounded)
 		{
 			vel = input.normalized * acceleration;
 		}
@@ -182,7 +215,7 @@ public class Controller : MonoBehaviour {
 	}
 
 	// Classic Quake movement
-	private Vector3 Accelerate(Vector3 accelDir, Vector3 prevVelocity, float accelerate, float max_velocity)
+	/*private Vector3 accelerate(Vector3 accelDir, Vector3 prevVelocity, float accelerate, float max_velocity)
 	{
 		float projVel = Vector3.Dot(prevVelocity, accelDir); // Vector projection of Current velocity onto accelDir.
 		float accelVel = accelerate * Time.fixedDeltaTime; // Accelerated velocity in direction of movment
@@ -192,14 +225,14 @@ public class Controller : MonoBehaviour {
 			accelVel = max_velocity - projVel;
 
 		return prevVelocity + accelDir * accelVel;
-	}
+	}*/
 
 	protected void rotate()
 	{
-		float yRot = -(Input.GetAxis("Y") * ySens);
+		float yRot = -(Input.GetAxis(LOOK_Y_AXIS) * ySens);
 		cam.transform.Rotate(new Vector3(1, 0, 0), yRot, Space.Self);
 
-		float xRot =  (Input.GetAxis("X") * xSens);
+		float xRot =  (Input.GetAxis(LOOK_X_AXIS) * xSens);
 		transform.Rotate(new Vector3(0, 1, 0), xRot, Space.World);
 	}
 
@@ -218,6 +251,14 @@ public class Controller : MonoBehaviour {
 		return false;
 	}
 
+	protected void applyGravity()
+	{
+		if(IsGrounded == false)
+		{
+			rb.velocity += Physics.gravity * Time.deltaTime;
+		}
+	}
+
 	protected void capLateralSpeed()
 	{
 		Vector2 lateralVel = new Vector2(rb.velocity.x, rb.velocity.z);
@@ -232,35 +273,41 @@ public class Controller : MonoBehaviour {
 	// Applies friction to player. Assumes normal of ground and player are both up
 	protected void applyFriction()
 	{
-		Vector2 vel = new Vector2(rb.velocity.x, rb.velocity.z);
-
-		Rigidbody groundRB = ground.GetComponent<Rigidbody>();
-		Vector2 groundVel = (groundRB == null) ? Vector2.zero : new Vector2(groundRB.velocity.x, groundRB.velocity.z);
-
-		Vector2 friction = Vector3.zero;
-		friction = ground.material.dynamicFriction * (vel - groundVel).normalized;
-
-		// If friction vector is larger than velocity vector, set to 0
-		if(friction.magnitude >= vel.magnitude)
+		if(IsGrounded)
 		{
-			vel = Vector2.zero;
+			Vector2 vel = new Vector2(rb.velocity.x, rb.velocity.z);
+
+			Rigidbody groundRB = ground.collider.GetComponent<Rigidbody>();
+			Vector2 groundVel = (groundRB == null) ? Vector2.zero : new Vector2(groundRB.velocity.x, groundRB.velocity.z);
+
+			Vector2 friction = Vector3.zero;
+			friction = ground.collider.material.dynamicFriction * (vel - groundVel).normalized;
+
+			// If friction vector is larger than velocity vector, set to 0
+			if(friction.magnitude >= vel.magnitude)
+			{
+				vel = Vector2.zero;
+			}
+			else
+			{
+				vel -= friction;
+			}
+			rb.velocity = new Vector3(vel.x, 0, vel.y);
 		}
-		else
-		{
-			vel -= friction;
-		}
-		rb.velocity = new Vector3(vel.x, 0, vel.y);
 	}
 
-	public bool isGrounded()
+	// Raycasts to the ground. Sets ground to the highest point
+	protected bool checkGrounded()
 	{
 		RaycastHit hit = new RaycastHit();
-		if(Physics.Raycast(transform.position + new Vector3(0, .1f, 0), -transform.up, out hit, GROUND_RAYCAST_DIST, jumpLM))
+		Vector3 point = transform.position + groundCheckOffset + new Vector3(rb.velocity.x, 0, rb.velocity.z).normalized/4;
+		if(Physics.Raycast(point, -transform.up, out hit, GROUND_RAYCAST_DIST, groundLM))
 		{
-			ground = hit.collider;
+			ground = hit;
 			return true;
 		}
-		ground = null;
+
+		ground = new RaycastHit();
 		return false;
 	}
 }

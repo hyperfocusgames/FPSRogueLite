@@ -16,7 +16,7 @@ public class Crosshair : MonoBehaviour
 
 	private GameObject crosshairs;
 
-	void Start()
+	void Awake()
 	{
 		if(instance != null)
 		{
