@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -7,24 +6,14 @@ public class Shoot : Ability
 {
 	protected const float MAX_DISTANCE = 100f;
 	protected Gun gun;
-	protected LineRenderer lr;
+	public float damage = 1f;
 	public LayerMask lm;
-
-	protected bool setup(GameObject go)
+	protected virtual bool setup(GameObject go)
 	{
 		gun = findGun(go);
 		if(gun != null)
 		{
-			lr = gun.GetComponentInChildren<LineRenderer>();
-			if(lr != null)
-			{
-				lr.positionCount = 2;
-			}
-
-			if(gun != null)
-			{
-				return true;
-			}
+			return true;
 		}
 
 		return false;
@@ -34,8 +23,8 @@ public class Shoot : Ability
 	{
 		return go.GetComponentInChildren<Gun>();
 	}
-
-    public override bool activate(GameObject go)
+	
+	public override bool activate(GameObject go)
     {
 		if(gun == null)
 		{
@@ -45,23 +34,6 @@ public class Shoot : Ability
 			}
 		}
 
-		if(base.activate(go))
-		{
-			Vector3 tar;
-			RaycastHit hit = new RaycastHit();
-			if(Physics.Raycast(transform.position, transform.forward, out hit, MAX_DISTANCE, lm))
-			{
-				tar = hit.point;
-			}
-			else
-			{
-				tar = transform.position + transform.forward * MAX_DISTANCE;
-			}
-
-			gun.playEffect(tar, effectTime);
-			return true;
-		}
-
-		return false;
-    }
+		return base.activate(go);
+	}
 }

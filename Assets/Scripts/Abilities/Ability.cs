@@ -7,6 +7,7 @@ public abstract class Ability : MonoBehaviour
 	protected float lastActivate = float.MinValue;
 
 	public float cooldownTime = 0f;
+	public float cost = 0f;
 	public GameObject effect;
 	public float effectTime;
 	public virtual bool activate(GameObject go)
@@ -26,9 +27,21 @@ public abstract class Ability : MonoBehaviour
 		return false;
 	}
 
+	public float Cost
+	{
+		get
+		{
+			return cost;
+		}
+		protected set
+		{
+			cost = value;
+		}
+	}
+
 	protected bool ready()
 	{
-		if(Time.time - lastActivate > cooldownTime)
+		if(Time.time - lastActivate > cooldownTime && (Cost <= 0 || Controller.instance.Energy > 0))
 		{
 			return true;
 		}

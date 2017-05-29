@@ -6,32 +6,37 @@ using UnityEngine;
 public class Controller : MonoBehaviour {
 	public static Controller instance;
 
+	protected const string MENU_AXIS = "Menu";
 	protected const string FORWARD_AXIS = "Vertical";
 	protected const string RIGHT_AXIS = "Horizontal";
 	protected const string JUMP_AXIS = "Jump";
 	protected const string LOOK_X_AXIS = "X";
 	protected const string LOOK_Y_AXIS = "Y";
 	protected const string SHOOT_AXIS = "Fire1";
+	protected const string ROCKET_AXIS = "Fire2";
 
-	protected const float HORIZONTAL_SNAP_PERCENT = .5f;
+	protected const string PP_XSENS_KEY = "xSense";
+	protected const string PP_YSENS_KEY = "ySense";
+
+	protected const float HORIZONTAL_SNAP_PERCENT = 1f;
 	protected const float HORIZONTAL_SPEED_PERCENT = 1f;
 	protected const float MAX_LATERAL_MAGNITUDE = 30f;
 	protected const float MAX_ACCELERATION = 10f;
 	protected const float GROUND_RAYCAST_DIST = .3f;
+	protected const float GRAV_MULT = 2f;
 
-	public float acceleration = 7f;
-	public float jumpForce = .5f;
-	public float xSens = 1f;
-	public float ySens = 1f;
+	protected float xSens = 1f;
+	protected float ySens = 1f;
 	public LayerMask groundLM;
 	public LineRenderer velocityLine;
 	public Vector3 velocityLineOffset;
 	public Vector3 groundCheckOffset = new Vector3(0, .1f, 0);
-	public Ability[] abilities;
 
 	protected Rigidbody rb;
 	protected Camera cam;
 	protected RaycastHit ground;
+	protected float jumpCost = 1f;
+	protected Entity entity;
 
 	public bool IsGrounded
 	{
@@ -41,7 +46,130 @@ public class Controller : MonoBehaviour {
 		}
 	}
 
-	void Start ()
+	public float XSens
+	{
+		get
+		{
+			return xSens;
+		}
+		set
+		{
+			xSens = value;
+			PlayerPrefs.SetFloat(PP_XSENS_KEY, XSens);
+		}
+	}
+
+	public float YSens
+	{
+		get
+		{
+			return ySens;
+		}
+		set
+		{
+			ySens = value;
+			PlayerPrefs.SetFloat(PP_YSENS_KEY, YSens);
+		}
+	}
+
+	public float Energy
+	{
+		get
+		{
+			return entity.Energy;
+		}
+		protected set
+		{
+			value = Mathf.Min(value, MaxEnergy);
+
+			entity.Energy = value;
+		}
+	}
+
+	public float MaxEnergy
+	{
+		get
+		{
+			return entity.MaxEnergy;
+		}
+		protected set
+		{
+			entity.MaxEnergy = value;
+		}
+	}
+
+	public float Health
+	{
+		get
+		{
+			return entity.Health;
+		}
+		protected set
+		{
+			value = Mathf.Min(value, entity.MaxHealth);
+
+			entity.Health = value;
+		}
+	}
+
+	public float MaxHealth
+	{
+		get
+		{
+			return entity.MaxHealth;
+		}
+		protected set
+		{
+			entity.MaxHealth = value;
+		}
+	}
+
+	public float Acceleration
+	{
+		get
+		{
+			return entity.Acceleration;
+		}
+		protected set
+		{
+			entity.Acceleration = value;
+		}
+	}
+
+	public float JumpForce
+	{
+		get
+		{
+			return entity.JumpForce;
+		}
+		protected set
+		{
+			entity.JumpForce = value;
+		}
+	}
+
+	public Entity Entity
+	{
+		get
+		{
+			return entity;
+		}
+		protected set
+		{
+			entity = value;
+		}
+	}
+
+	public Ability[] Abilities
+	{
+		get
+		{
+			return entity.Abilities;
+		}
+	}
+
+	// Run ASAP
+	void Awake()
 	{
 		if(instance != null)
 		{
@@ -50,7 +178,11 @@ public class Controller : MonoBehaviour {
 		}
 
 		instance = this;
+	}
 
+	void Start()
+	{
+		entity = GetComponent<Entity>();
 		rb = GetComponent<Rigidbody>();
 		cam = GetComponentInChildren<Camera>();
 
@@ -58,6 +190,7 @@ public class Controller : MonoBehaviour {
 		velocityLine.positionCount = 2;
 
 		lockMouse();
+		loadSetting();
 	}
 
 	void Update ()
@@ -67,7 +200,23 @@ public class Controller : MonoBehaviour {
 
 		if(Input.GetButtonDown(SHOOT_AXIS))
 		{
-			abilities[0].activate(gameObject);
+			if(Abilities[0].activate(gameObject))
+			{
+				Energy -= Abilities[0].cost;
+			}
+		}
+
+		if(Input.GetButtonDown(ROCKET_AXIS))
+		{
+			if(Abilities[1].activate(gameObject))
+			{
+				Energy -= Abilities[1].cost;
+			}
+		}
+
+		if(Input.GetButtonDown(MENU_AXIS))
+		{
+			toggleMouse();
 		}
 	}
 
@@ -86,7 +235,19 @@ public class Controller : MonoBehaviour {
 		capLateralSpeed();
 
 		applyGravity();
+	}
 
+	protected void loadSetting()
+	{
+		if(PlayerPrefs.HasKey(PP_XSENS_KEY))
+		{
+			XSens = PlayerPrefs.GetFloat(PP_XSENS_KEY);
+		}
+
+		if(PlayerPrefs.HasKey(PP_YSENS_KEY))
+		{
+			YSens = PlayerPrefs.GetFloat(PP_YSENS_KEY);
+		}
 	}
 
 	public void lockMouse()
@@ -103,6 +264,20 @@ public class Controller : MonoBehaviour {
 		Cursor.visible = true;
 
 		Crosshair.instance.degenerate();
+	}
+
+	public bool toggleMouse()
+	{
+		if(Cursor.lockState == CursorLockMode.Locked)
+		{
+			unlockMouse();
+			return false;
+		}
+		else
+		{
+			lockMouse();
+			return true;
+		}
 	}
 
 	protected void move()
@@ -180,19 +355,19 @@ public class Controller : MonoBehaviour {
 		Vector3 vel;
 		if(input.z != 0 && IsGrounded)
 		{
-			vel = input.normalized * acceleration;
+			vel = input.normalized * Acceleration;
 		}
 		else if(input.x != 0)
 		{
 			vel = startVel;
 
 			// Strafe acceleration
-			Vector3 accel = (input.normalized * (HORIZONTAL_SNAP_PERCENT * acceleration)) * Time.fixedDeltaTime;
+			Vector3 accel = (input.normalized * (HORIZONTAL_SNAP_PERCENT * Acceleration)) * Time.fixedDeltaTime;
 
 			// If less than snap amount, snap horizontal speed to correct value
-			if(Mathf.Abs(vel.x + accel.x) < HORIZONTAL_SNAP_PERCENT * acceleration)
+			if(Mathf.Abs(vel.x + accel.x) < HORIZONTAL_SNAP_PERCENT * Acceleration)
 			{
-				vel.x = (HORIZONTAL_SNAP_PERCENT * acceleration) * (Mathf.Sign(input.x));
+				vel.x = (HORIZONTAL_SNAP_PERCENT * Acceleration) * (Mathf.Sign(input.x));
 			}
 
 			// OW add strafe acceleration
@@ -229,21 +404,27 @@ public class Controller : MonoBehaviour {
 
 	protected void rotate()
 	{
-		float yRot = -(Input.GetAxis(LOOK_Y_AXIS) * ySens);
-		cam.transform.Rotate(new Vector3(1, 0, 0), yRot, Space.Self);
+		float xRot =  (Input.GetAxis(LOOK_X_AXIS) * XSens);
+		//transform.Rotate(new Vector3(0, 1, 0), xRot, Space.World);
 
-		float xRot =  (Input.GetAxis(LOOK_X_AXIS) * xSens);
-		transform.Rotate(new Vector3(0, 1, 0), xRot, Space.World);
+		float yRot = -(Input.GetAxis(LOOK_Y_AXIS) * YSens);
+		//cam.transform.Rotate(new Vector3(1, 0, 0), yRot, Space.Self);
+
+		entity.rotate(xRot, yRot, Space.Self);
 	}
 
 	protected bool jump()
 	{
-		if(Input.GetAxisRaw(JUMP_AXIS) != 0)
+		if(Input.GetAxisRaw(JUMP_AXIS) != 0 && Energy > 0)
 		//if(Input.GetButtonDown(jumpAxis))
 		{
 			Vector3 vel = rb.velocity;
-			vel.y = jumpForce * (-Physics.gravity.y);
+			vel.y = JumpForce * (-Physics.gravity.y);
 			rb.velocity = vel;
+
+			Energy -= jumpCost;
+
+			//ground = new RaycastHit();	// Fixes jumping off sloped surface adding more Y acceleration when jumping
 
 			return true;
 		}
@@ -255,16 +436,16 @@ public class Controller : MonoBehaviour {
 	{
 		if(IsGrounded == false)
 		{
-			rb.velocity += Physics.gravity * Time.deltaTime;
+			rb.velocity += Physics.gravity * GRAV_MULT * Time.fixedDeltaTime;
 		}
 	}
 
 	protected void capLateralSpeed()
 	{
 		Vector2 lateralVel = new Vector2(rb.velocity.x, rb.velocity.z);
-		if(lateralVel.magnitude > MAX_LATERAL_MAGNITUDE)
+		if(lateralVel.magnitude > entity.maxSpeed)
 		{
-			lateralVel = lateralVel.normalized * MAX_LATERAL_MAGNITUDE;
+			lateralVel = lateralVel.normalized * entity.maxSpeed;
 		}
 
 		rb.velocity = new Vector3(lateralVel.x, rb.velocity.y, lateralVel.y);
